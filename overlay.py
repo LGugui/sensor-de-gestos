@@ -28,9 +28,12 @@ class Overlay:
             self._fps_hist.pop(0)
         return sum(self._fps_hist) / len(self._fps_hist)
 
-    def draw(self, frame, mode, hand_detected, palm_progress=0.0, menu=None, cursor_pos=None, debug_lm=None, gestures=None):
+    def draw(self, frame, mode, hand_detected, palm_progress=0.0, menu=None, cursor_pos=None, debug_lm=None, gestures=None, cam_margin=None):
         fps = self._fps()
         h, w = frame.shape[:2]
+
+        if cam_margin is not None:
+            self._draw_mapping_area(frame, cam_margin)
 
         if self._flash > 0:
             cv2.rectangle(frame, (0, 0), (w, h), (0, 255, 0), 8)
@@ -69,6 +72,35 @@ class Overlay:
             self._draw_menu(frame, menu, cursor_pos)
 
         return frame
+
+    def _draw_mapping_area(self, frame, margin):
+        h, w = frame.shape[:2]
+        m = margin
+        x1 = int(m * w)
+        y1 = int(m * h)
+        x2 = int((1 - m) * w)
+        y2 = int((1 - m) * h)
+
+        # Darken areas outside the active zone
+        buf = frame.copy()
+        cv2.rectangle(buf, (0, 0), (w, y1), (0, 0, 0), -1)        # top
+        cv2.rectangle(buf, (0, y2), (w, h), (0, 0, 0), -1)        # bottom
+        cv2.rectangle(buf, (0, y1), (x1, y2), (0, 0, 0), -1)      # left
+        cv2.rectangle(buf, (x2, y1), (w, y2), (0, 0, 0), -1)      # right
+        cv2.addWeighted(buf, 0.45, frame, 0.55, 0, frame)
+
+        # Active zone border
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 220, 255), 1)
+
+        # 3x3 grid (each cell = 1/3 of screen)
+        aw = x2 - x1
+        ah = y2 - y1
+        for col in range(1, 3):
+            lx = x1 + col * aw // 3
+            cv2.line(frame, (lx, y1), (lx, y2), (0, 140, 180), 1)
+        for row in range(1, 3):
+            ly = y1 + row * ah // 3
+            cv2.line(frame, (x1, ly), (x2, ly), (0, 140, 180), 1)
 
     def _draw_menu(self, frame, menu, cursor_pos):
         h, w = frame.shape[:2]

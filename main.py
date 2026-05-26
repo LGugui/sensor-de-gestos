@@ -298,6 +298,7 @@ def main():
                     cursor_pos=(cursor_x, cursor_y),
                     debug_lm=cursor_lm,
                     gestures=gestures,
+                    cam_margin=mapper.margin,
                 )
                 overlay.show(frame)
 

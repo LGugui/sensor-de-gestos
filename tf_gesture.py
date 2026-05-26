@@ -1,11 +1,11 @@
 """
-TFLite gesture classifier. Loaded optionally by GestureDetector.
-If gesture_model.tflite is absent, gestures.py falls back to rule-based.
+Gesture classifier backed by scikit-learn MLP + joblib.
+TensorFlow not required — works on Python 3.14.
 """
 import math
 import os
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "gesture_model.tflite")
+MODEL_PATH  = os.path.join(os.path.dirname(__file__), "gesture_model.pkl")
 CLASSES_PATH = os.path.join(os.path.dirname(__file__), "gesture_classes.txt")
 
 GESTURE_CLASSES = [
@@ -37,41 +37,33 @@ def normalize_lm(lm):
     return coords  # 63 values
 
 
-class TFGestureClassifier:
+class GestureClassifier:
     def __init__(self, model_path=MODEL_PATH):
-        import os
-        os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+        import joblib
         import numpy as np
-        import tensorflow as tf
-
+        self._model = joblib.load(model_path)
         self._np = np
-        self._interp = tf.lite.Interpreter(model_path=model_path)
-        self._interp.allocate_tensors()
-        inp = self._interp.get_input_details()
-        out = self._interp.get_output_details()
-        self._in_idx = inp[0]["index"]
-        self._out_idx = out[0]["index"]
-
         if os.path.exists(CLASSES_PATH):
             with open(CLASSES_PATH) as f:
-                self._classes = [l.strip() for l in f if l.strip()]
+                self._classes = [ln.strip() for ln in f if ln.strip()]
         else:
             self._classes = GESTURE_CLASSES
-
-        print(f"[TFGesture] modelo carregado: {model_path}")
-        print(f"[TFGesture] classes: {self._classes}")
+        print(f"[GestureClassifier] modelo carregado: {model_path}")
+        print(f"[GestureClassifier] classes: {self._classes}")
 
     def classify(self, lm):
-        """Returns dict[class_name → confidence]."""
+        """Returns dict[class_name → confidence float]."""
         features = normalize_lm(lm)
-        inp = self._np.array([features], dtype=self._np.float32)
-        self._interp.set_tensor(self._in_idx, inp)
-        self._interp.invoke()
-        probs = self._interp.get_tensor(self._out_idx)[0]
+        inp = self._np.array([features])
+        probs = self._model.predict_proba(inp)[0]
         return {cls: float(p) for cls, p in zip(self._classes, probs)}
 
     def top(self, lm):
-        """Returns (class_name, confidence) of the top prediction."""
+        """Returns (class_name, confidence) of highest-probability class."""
         probs = self.classify(lm)
         best = max(probs, key=probs.get)
         return best, probs[best]
+
+
+# Alias kept so gestures.py import doesn't need changing
+TFGestureClassifier = GestureClassifier

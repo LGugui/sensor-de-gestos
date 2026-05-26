@@ -2,4 +2,4 @@ mediapipe
 opencv-python
 pynput
 numpy
-tensorflow
+scikit-learn

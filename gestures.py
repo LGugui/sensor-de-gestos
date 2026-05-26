@@ -28,6 +28,29 @@ class GestureDetector:
         self._last_click_t = None
         self._prev_depth = None
 
+        # TF classifier (optional — falls back to rule-based if absent)
+        self._tf = None
+        self._tf_cache_key = None
+        self._tf_cache_probs = {}
+        try:
+            from tf_gesture import TFGestureClassifier
+            self._tf = TFGestureClassifier()
+        except Exception:
+            pass  # no model or TF not installed — rules only
+
+    # ── TF inference (per-frame cache) ───────────────────────────────────
+
+    def _tf_probs(self, lm):
+        """Returns TF probability dict for lm, cached per unique frame."""
+        if self._tf is None:
+            return {}
+        # Cache key: wrist position rounded to 4 decimals (changes every frame when moving)
+        key = (round(lm[0].x, 4), round(lm[0].y, 4))
+        if self._tf_cache_key != key:
+            self._tf_cache_probs = self._tf.classify(lm)
+            self._tf_cache_key = key
+        return self._tf_cache_probs
+
     # ── Pseudo-depth (webcam only) ────────────────────────────────────────
     # Wrist-to-middle-MCP distance in normalized space correlates with
     # hand distance from camera: ~0.10 = far (~80cm), ~0.15 = normal (~50cm),
@@ -105,8 +128,10 @@ class GestureDetector:
         Must be called BEFORE detect_pinch — consumes the second pinch event."""
         if self._pinching_left:
             return False
-        dl = self._dist(landmarks[4], landmarks[8])
-        if dl < self.pinch_close:
+        probs = self._tf_probs(landmarks)
+        is_pinch = (probs.get("pinch_left", 0) > 0.70) if probs else (
+            self._dist(landmarks[4], landmarks[8]) < self.pinch_close)
+        if is_pinch:
             now = time.time()
             if self._last_click_t and now - self._last_click_t < 0.4:
                 self._last_click_t = None
@@ -117,30 +142,46 @@ class GestureDetector:
 
     def detect_pinch(self, landmarks):
         """Returns 'left', 'right' on transition, else None. Has hysteresis."""
-        dl = self._dist(landmarks[4], landmarks[8])
-        dr = self._dist(landmarks[4], landmarks[12])
+        probs = self._tf_probs(landmarks)
         fired = None
 
-        if not self._pinching_left and dl < self.pinch_close:
+        if probs:
+            # TF path: hysteresis via probability bands (0.70 start, 0.35 stop)
+            is_l = (probs.get("pinch_left", 0) > (0.35 if self._pinching_left else 0.70))
+            is_r = (probs.get("pinch_right", 0) > (0.35 if self._pinching_right else 0.70))
+        else:
+            # Rule-based fallback
+            dl = self._dist(landmarks[4], landmarks[8])
+            dr = self._dist(landmarks[4], landmarks[12])
+            is_l = dl < (self.pinch_open if self._pinching_left else self.pinch_close)
+            is_r = dr < (self.pinch_open if self._pinching_right else self.pinch_close)
+
+        if not self._pinching_left and is_l:
             self._pinching_left = True
             fired = "left"
-        elif self._pinching_left and dl > self.pinch_open:
+        elif self._pinching_left and not is_l:
             self._pinching_left = False
 
         if not fired:
-            if not self._pinching_right and dr < self.pinch_close:
+            if not self._pinching_right and is_r:
                 self._pinching_right = True
                 fired = "right"
-            elif self._pinching_right and dr > self.pinch_open:
+            elif self._pinching_right and not is_r:
                 self._pinching_right = False
 
         return fired
 
     def detect_precision(self, landmarks):
+        probs = self._tf_probs(landmarks)
+        if probs:
+            return probs.get("precision", 0) > 0.60
         d = self._dist(landmarks[4], landmarks[8])
         return self.precision_min < d < self.precision_max
 
     def detect_scroll_mode(self, landmarks):
+        probs = self._tf_probs(landmarks)
+        if probs:
+            return probs.get("scroll", 0) > 0.65
         return (
             self._extended_sq(landmarks, 8, 6)
             and self._extended_sq(landmarks, 12, 10)
@@ -172,18 +213,23 @@ class GestureDetector:
 
     def detect_fist(self, landmarks):
         """Returns True on the frame the fist closes (rising edge)."""
-        is_fist = self._all_closed(landmarks)
+        probs = self._tf_probs(landmarks)
+        is_fist = (probs.get("fist", 0) > 0.70) if probs else self._all_closed(landmarks)
         fired = is_fist and not self._fist_prev
         self._fist_prev = is_fist
         return fired
 
     def detect_pinky_only(self, landmarks):
-        is_pinky = (
-            self._extended_sq(landmarks, 20, 18)
-            and not self._extended_sq(landmarks, 8, 6)
-            and not self._extended_sq(landmarks, 12, 10)
-            and not self._extended_sq(landmarks, 16, 14)
-        )
+        probs = self._tf_probs(landmarks)
+        if probs:
+            is_pinky = probs.get("pinky_only", 0) > 0.70
+        else:
+            is_pinky = (
+                self._extended_sq(landmarks, 20, 18)
+                and not self._extended_sq(landmarks, 8, 6)
+                and not self._extended_sq(landmarks, 12, 10)
+                and not self._extended_sq(landmarks, 16, 14)
+            )
         fired = is_pinky and not self._pinky_prev
         self._pinky_prev = is_pinky
         return fired
@@ -191,7 +237,9 @@ class GestureDetector:
     # ── Two-hand gestures ─────────────────────────────────────────────────
 
     def detect_open_palm(self, landmarks):
-        if self._all_extended(landmarks):
+        probs = self._tf_probs(landmarks)
+        is_palm = (probs.get("open_palm", 0) > 0.65) if probs else self._all_extended(landmarks)
+        if is_palm:
             if self._palm_start is None:
                 self._palm_start = time.time()
             return min(1.0, (time.time() - self._palm_start) / self.menu_hold)
@@ -200,12 +248,16 @@ class GestureDetector:
 
     def detect_ring_hold(self, landmarks):
         """Ring finger only extended, others closed. Returns hold progress [0,1]."""
-        is_ring = (
-            self._extended_sq(landmarks, 16, 14)
-            and not self._extended_sq(landmarks, 8, 6)
-            and not self._extended_sq(landmarks, 12, 10)
-            and not self._extended_sq(landmarks, 20, 18)
-        )
+        probs = self._tf_probs(landmarks)
+        if probs:
+            is_ring = probs.get("ring_only", 0) > 0.65
+        else:
+            is_ring = (
+                self._extended_sq(landmarks, 16, 14)
+                and not self._extended_sq(landmarks, 8, 6)
+                and not self._extended_sq(landmarks, 12, 10)
+                and not self._extended_sq(landmarks, 20, 18)
+            )
         if is_ring:
             if self._victory_start is None:
                 self._victory_start = time.time()

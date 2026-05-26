@@ -6,21 +6,23 @@ DEFAULTS = {
     "detection_confidence": 0.7,
     "tracking_confidence": 0.5,
     "max_hands": 1,
-    "sensitivity": 1.0,
+    "ema_alpha": 0.35,
+    "cam_margin": 0.1,
     "dead_zone_px": 5,
-    "smoothing_frames": 5,
-    "pinch_threshold": 0.05,
-    "precision_threshold_min": 0.05,
-    "precision_threshold_max": 0.12,
+    "pinch_close": 0.05,
+    "pinch_open": 0.08,
+    "precision_threshold_min": 0.08,
+    "precision_threshold_max": 0.15,
     "precision_factor": 0.3,
     "scroll_speed": 3,
     "debounce_ms": 300,
+    "menu_hold_seconds": 1.5,
 }
 
 
 def load(path="config.json"):
     if not os.path.exists(path):
-        _save(DEFAULTS, path)
+        save(DEFAULTS, path)
         return DEFAULTS.copy()
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -35,8 +37,8 @@ def load(path="config.json"):
     return result
 
 
-def _save(cfg, path="config.json"):
+def save(cfg, path="config.json"):
     data = {"_comment": "Sensor de Gestos — edite com cuidado"}
-    data.update(cfg)
+    data.update({k: v for k, v in cfg.items() if not k.startswith("_")})
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

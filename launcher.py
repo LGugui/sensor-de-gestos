@@ -44,7 +44,7 @@ class Launcher:
         self._root.title("Sensor de Gestos")
         self._root.configure(bg=BG)
         self._root.resizable(False, False)
-        self._root.geometry("420x580")
+        self._root.geometry("420x700")
         self._root.eval('tk::PlaceWindow . center')
 
         self._build_ui()
@@ -75,9 +75,12 @@ class Launcher:
         cfg_frame = tk.Frame(r, bg=BG2, padx=20, pady=16)
         cfg_frame.pack(fill="x", padx=24, pady=8)
 
-        self._slider(cfg_frame, "Sensibilidade", "ema_alpha", 0.1, 0.9, 0.05)
+        self._slider(cfg_frame, "Responsividade", "filter_beta", 0.0, 0.5, 0.01)
+        self._slider(cfg_frame, "Suavidade", "filter_min_cutoff", 0.1, 2.0, 0.1)
+        self._slider(cfg_frame, "Sensibilidade", "sensitivity", 0.5, 3.0, 0.1)
         self._slider(cfg_frame, "Velocidade Scroll", "scroll_speed", 1, 10, 1)
         self._slider(cfg_frame, "Tempo Menu (s)", "menu_hold_seconds", 0.5, 3.0, 0.1)
+        self._mapping_mode_selector(cfg_frame)
         self._hand_selector(cfg_frame)
 
         tk.Frame(r, bg=BG2, height=1).pack(fill="x", padx=40, pady=10)
@@ -133,6 +136,20 @@ class Launcher:
                 bg=BG2, fg=TEXT, selectcolor=BG,
                 activebackground=BG2, font=("Segoe UI", 9),
                 command=lambda: (self._cfg.update({"dominant_hand": var.get()}), self._save_cfg())
+            ).pack(side="left", padx=4)
+
+    def _mapping_mode_selector(self, parent):
+        val = self._cfg.get("mapping_mode", "relative")
+        var = tk.StringVar(value=val)
+        row = tk.Frame(parent, bg=BG2)
+        row.pack(fill="x", pady=4)
+        tk.Label(row, text="Modo cursor", bg=BG2, fg=TEXT, font=("Segoe UI", 9), width=18, anchor="w").pack(side="left")
+        for opt, label in (("relative", "Relativo"), ("absolute", "Absoluto")):
+            tk.Radiobutton(
+                row, text=label, variable=var, value=opt,
+                bg=BG2, fg=TEXT, selectcolor=BG,
+                activebackground=BG2, font=("Segoe UI", 9),
+                command=lambda: (self._cfg.update({"mapping_mode": var.get()}), self._save_cfg())
             ).pack(side="left", padx=4)
 
     def _on_start(self):

@@ -1,3 +1,4 @@
+import math
 import time
 
 import cv2
@@ -9,6 +10,7 @@ class Overlay:
     def __init__(self):
         self.active = True
         self.show_cheatsheet = False
+        self.show_debug = False
         self._flash = 0
         self._fps_hist = []
         self._last_t = time.time()
@@ -26,7 +28,7 @@ class Overlay:
             self._fps_hist.pop(0)
         return sum(self._fps_hist) / len(self._fps_hist)
 
-    def draw(self, frame, mode, hand_detected, palm_progress=0.0, menu=None, cursor_pos=None):
+    def draw(self, frame, mode, hand_detected, palm_progress=0.0, menu=None, cursor_pos=None, debug_lm=None, gestures=None):
         fps = self._fps()
         h, w = frame.shape[:2]
 
@@ -45,13 +47,16 @@ class Overlay:
         )
         cv2.putText(
             frame,
-            "Q=sair | O=overlay | R=reload | ?=gestos",
+            "Q=sair | O=overlay | K=teclado | B=pincel | R=reload | ?=gestos",
             (10, h - 10),
             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1,
         )
 
         if self.show_cheatsheet:
             self._draw_cheatsheet(frame)
+
+        if self.show_debug and debug_lm is not None and gestures is not None:
+            self._draw_debug(frame, debug_lm, gestures)
 
         # Palm hold progress bar
         if 0.0 < palm_progress < 1.0:
@@ -112,20 +117,28 @@ class Overlay:
             ("Pinch polegar+medio →  clique dir", (200, 200, 200)),
             ("Semi-pinch          →  modo precisao", (200, 200, 200)),
             ("Indic+medio eretos  →  scroll", (200, 200, 200)),
-            ("Sinal V (1s)        →  modo desenho", (200, 200, 200)),
+            ("Anelar sozinho (4s) →  modo desenho", (200, 200, 200)),
             ("", None),
             ("GESTOS BIMANUAL", (0, 220, 255)),
             ("Ambas palmas (1.5s) →  menu", (200, 200, 200)),
             ("Punho esq           →  teclado virtual", (200, 200, 200)),
+            ("Mindinho sozinho    →  teclado virtual", (200, 200, 200)),
             ("Punho esq (desenho) →  limpar canvas", (200, 200, 200)),
+            ("Indicadores tocam   →  carimbar forma", (200, 200, 200)),
             ("", None),
             ("TECLADO", (0, 220, 255)),
+            ("K  →  teclado virtual", (200, 200, 200)),
+            ("B  →  modo pincel/desenho", (200, 200, 200)),
+            ("S  →  ciclar forma (circulo/quadrado...)", (200, 200, 200)),
+            ("C  →  ciclar cor do pincel", (200, 200, 200)),
+            ("Z  →  desfazer ultimo traco", (200, 200, 200)),
+            ("E  →  exportar canvas como PNG", (200, 200, 200)),
             ("?  →  toggle este painel", (200, 200, 200)),
             ("O  →  toggle overlay", (200, 200, 200)),
             ("R  →  recarregar config", (200, 200, 200)),
             ("Q  →  sair", (200, 200, 200)),
         ]
-        px, py, pw = w - 340, 10, 330
+        px, py, pw = w - 360, 10, 350
         ph = len(lines) * 22 + 20
         buf = frame.copy()
         cv2.rectangle(buf, (px - 8, py), (px + pw, py + ph), (10, 10, 10), -1)
@@ -135,6 +148,29 @@ class Overlay:
             if color and text:
                 cv2.putText(frame, text, (px, py + 18 + i * 22),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.42, color, 1)
+
+    def _draw_debug(self, frame, lm, gestures):
+        h, w = frame.shape[:2]
+        states = gestures.finger_states(lm)
+        names = ["thumb", "index", "middle", "ring", "pinky"]
+        labels = ["POL", "IND", "MED", "ANE", "MIN"]
+        px = 10
+        py = h - 60
+        buf = frame.copy()
+        cv2.rectangle(buf, (px - 4, py - 18), (px + 270, py + 22), (10, 10, 10), -1)
+        cv2.addWeighted(buf, 0.75, frame, 0.25, 0, frame)
+        cv2.putText(frame, "DEBUG DEDOS:", (px, py),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 255), 1)
+        for i, (name, label) in enumerate(zip(names, labels)):
+            on = states[name]
+            color = (0, 255, 80) if on else (80, 80, 80)
+            cv2.putText(frame, label, (px + 100 + i * 35, py),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+        # pinch distances
+        d_left = math.sqrt((lm[4].x - lm[8].x)**2 + (lm[4].y - lm[8].y)**2)
+        d_right = math.sqrt((lm[4].x - lm[12].x)**2 + (lm[4].y - lm[12].y)**2)
+        cv2.putText(frame, f"pinch L:{d_left:.3f} R:{d_right:.3f}", (px, py + 18),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 80), 1)
 
     def show(self, frame):
         cv2.imshow(self._win, frame)

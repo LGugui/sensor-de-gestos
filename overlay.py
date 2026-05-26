@@ -50,7 +50,7 @@ class Overlay:
         )
         cv2.putText(
             frame,
-            "Q=sair | O=overlay | K=teclado | B=pincel | R=reload | ?=gestos",
+            "Q=sair | O=overlay | K=teclado | B=pincel | F=calibrar | ?=gestos",
             (10, h - 10),
             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 180), 1,
         )
@@ -219,6 +219,43 @@ class Overlay:
         cv2.rectangle(frame, (px, py + 28), (px + bar_w, py + 38), (0, 200, 255), -1)
         cv2.putText(frame, f"DEPTH:{depth:.3f}", (px + 156, py + 38),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 200, 255), 1)
+
+    def draw_calibration(self, frame, calibrator, hand_detected, progress):
+        h, w = frame.shape[:2]
+        buf = frame.copy()
+        cv2.rectangle(buf, (0, 0), (w, h), (0, 0, 0), -1)
+        cv2.addWeighted(buf, 0.55, frame, 0.45, 0, frame)
+
+        cv2.putText(frame, "CALIBRACAO", (w // 2 - 110, 52),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 220, 255), 2)
+        cv2.putText(frame, f"Passo {calibrator.step + 1} de {calibrator.total}",
+                    (w // 2 - 70, 82), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (160, 160, 160), 1)
+
+        mid_y = h // 2
+        cv2.putText(frame, "Mova a mao para o canto:", (w // 2 - 155, mid_y - 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (200, 200, 200), 1)
+        cv2.putText(frame, calibrator.label, (w // 2 - 160, mid_y + 14),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.95, (0, 220, 255), 2)
+
+        if not hand_detected:
+            cv2.putText(frame, "Mostre a mao direita!", (w // 2 - 120, mid_y + 55),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 80, 255), 1)
+        else:
+            bx1, by1, bx2, by2 = 60, mid_y + 40, w - 60, mid_y + 58
+            cv2.rectangle(frame, (bx1, by1), (bx2, by2), (50, 50, 50), -1)
+            fill = int((bx2 - bx1) * progress)
+            cv2.rectangle(frame, (bx1, by1), (bx1 + fill, by2), (0, 220, 255), -1)
+
+        # Crosshair at target corner
+        pad = 36
+        tx = pad if calibrator.target_fx == 0 else w - pad
+        ty = pad if calibrator.target_fy == 0 else h - pad
+        cv2.drawMarker(frame, (tx, ty), (0, 220, 255), cv2.MARKER_CROSS, 32, 2)
+        cv2.circle(frame, (tx, ty), 18, (0, 220, 255), 1)
+
+        cv2.putText(frame, "F = pular calibracao", (10, h - 12),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (100, 100, 100), 1)
+        return frame
 
     def show(self, frame):
         cv2.imshow(self._win, frame)

@@ -4,6 +4,7 @@ import cv2
 from pynput.mouse import Button
 
 import config as cfg_module
+from calibration import Calibrator
 from camera import Camera
 from controller import MouseController
 from detector import HandDetector
@@ -52,6 +53,14 @@ def main():
     cam = Camera(cfg["camera_index"])
     detector, mapper, mouse, gestures = _rebuild(cfg)
 
+    # Load calibration if available; otherwise auto-start calibration
+    saved_cal = cfg_module.load_calibration()
+    if saved_cal:
+        mapper.calibrate(*saved_cal)
+        calibrator = None
+    else:
+        calibrator = Calibrator()
+
     if launcher_result == RESULT_TUTORIAL:
         run_tutorial(cam, detector)
     overlay = Overlay()
@@ -99,6 +108,24 @@ def main():
             prev_hand_detected = hand_detected
             palm_progress = 0.0
             victory_progress = 0.0
+
+            # ── CALIBRATION mode (priority) ──────────────────────────────
+            if calibrator is not None and not calibrator.done:
+                cal_progress = calibrator.update(cursor_lm) if hand_detected else 0.0
+                if calibrator.done:
+                    cfg_module.save_calibration(*calibrator.result)
+                    mapper.calibrate(*calibrator.result)
+                    calibrator = None
+                else:
+                    frame = overlay.draw_calibration(
+                        frame, calibrator, hand_detected, cal_progress or 0.0)
+                    overlay.show(frame)
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord("q"):
+                        break
+                    elif key == ord("f"):
+                        calibrator = None  # skip without saving
+                    continue
 
             # ── DRAW mode ────────────────────────────────────────────────
             if draw_mode:
@@ -322,6 +349,9 @@ def main():
                 overlay.show_cheatsheet = not overlay.show_cheatsheet
             elif key == ord("d"):
                 overlay.show_debug = not overlay.show_debug
+            elif key == ord("f"):
+                calibrator = Calibrator()
+                print("Recalibrando...")
             elif key == ord("k"):
                 keyboard.toggle()
             elif key == ord("b"):

@@ -74,9 +74,17 @@ class CoordMapper:
         self.smooth_y = float(self.screen_h // 2)
         self._prev_lm_x = None
         self._prev_lm_y = None
-        # kept for absolute-mode dead zone
         self.prev_x = self.screen_w // 2
         self.prev_y = self.screen_h // 2
+        self._cal = None  # (min_x, max_x, min_y, max_y) — set by calibrate()
+
+    def calibrate(self, min_x, max_x, min_y, max_y):
+        self._cal = (min_x, max_x, min_y, max_y)
+
+    def _norm_cal(self, v, lo, hi):
+        if hi - lo < 0.01:
+            return 0.5
+        return max(0.0, min(1.0, (v - lo) / (hi - lo)))
 
     def reset_position(self):
         """Call when cursor hand is lost — prevents jump on re-detection."""
@@ -107,8 +115,12 @@ class CoordMapper:
         return self._map_absolute(tip, precision)
 
     def _map_absolute(self, tip, precision, depth=None):
-        nx = self._normalize(tip.x)
-        ny = self._normalize(tip.y)
+        if self._cal:
+            nx = self._norm_cal(tip.x, self._cal[0], self._cal[1])
+            ny = self._norm_cal(tip.y, self._cal[2], self._cal[3])
+        else:
+            nx = self._normalize(tip.x)
+            ny = self._normalize(tip.y)
         raw_x = nx * self.screen_w
         raw_y = ny * self.screen_h
 

@@ -44,3 +44,23 @@ def save(cfg, path="config.json"):
     data.update({k: v for k, v in cfg.items() if not k.startswith("_")})
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+_CAL_PATH = os.path.join(os.path.dirname(__file__), "calibration.json")
+
+
+def load_calibration():
+    if not os.path.exists(_CAL_PATH):
+        return None
+    try:
+        with open(_CAL_PATH, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        return (d["min_x"], d["max_x"], d["min_y"], d["max_y"])
+    except Exception:
+        return None
+
+
+def save_calibration(min_x, max_x, min_y, max_y):
+    with open(_CAL_PATH, "w", encoding="utf-8") as f:
+        json.dump({"min_x": min_x, "max_x": max_x,
+                   "min_y": min_y, "max_y": max_y}, f, indent=2)

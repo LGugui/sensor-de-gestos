@@ -81,26 +81,34 @@ class Overlay:
         x2 = int((1 - m) * w)
         y2 = int((1 - m) * h)
 
-        # Darken areas outside the active zone
+        # Darken areas outside the active zone (reference only)
         buf = frame.copy()
-        cv2.rectangle(buf, (0, 0), (w, y1), (0, 0, 0), -1)        # top
-        cv2.rectangle(buf, (0, y2), (w, h), (0, 0, 0), -1)        # bottom
-        cv2.rectangle(buf, (0, y1), (x1, y2), (0, 0, 0), -1)      # left
-        cv2.rectangle(buf, (x2, y1), (w, y2), (0, 0, 0), -1)      # right
+        cv2.rectangle(buf, (0, 0), (w, y1), (0, 0, 0), -1)
+        cv2.rectangle(buf, (0, y2), (w, h), (0, 0, 0), -1)
+        cv2.rectangle(buf, (0, y1), (x1, y2), (0, 0, 0), -1)
+        cv2.rectangle(buf, (x2, y1), (w, y2), (0, 0, 0), -1)
         cv2.addWeighted(buf, 0.45, frame, 0.55, 0, frame)
 
-        # Active zone border
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 220, 255), 1)
-
-        # 3x3 grid (each cell = 1/3 of screen)
+        # 3x3 grid — subtle inner reference lines
         aw = x2 - x1
         ah = y2 - y1
         for col in range(1, 3):
             lx = x1 + col * aw // 3
-            cv2.line(frame, (lx, y1), (lx, y2), (0, 140, 180), 1)
+            cv2.line(frame, (lx, y1), (lx, y2), (0, 100, 130), 1)
         for row in range(1, 3):
             ly = y1 + row * ah // 3
-            cv2.line(frame, (x1, ly), (x2, ly), (0, 140, 180), 1)
+            cv2.line(frame, (x1, ly), (x2, ly), (0, 100, 130), 1)
+
+        # Outer border = screen limit (thick, prominent)
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 220, 255), 2)
+
+        # Corner labels
+        pad = 4
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        cv2.putText(frame, "TELA", (x1 + pad, y1 + 14), font, 0.38, (0, 220, 255), 1)
+        cv2.putText(frame, "TELA", (x2 - 38, y1 + 14), font, 0.38, (0, 220, 255), 1)
+        cv2.putText(frame, "TELA", (x1 + pad, y2 - 4), font, 0.38, (0, 220, 255), 1)
+        cv2.putText(frame, "TELA", (x2 - 38, y2 - 4), font, 0.38, (0, 220, 255), 1)
 
     def _draw_menu(self, frame, menu, cursor_pos):
         h, w = frame.shape[:2]

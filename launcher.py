@@ -80,7 +80,7 @@ class Launcher:
         self._slider(cfg_frame, "Sensibilidade", "sensitivity", 0.5, 3.0, 0.1)
         self._slider(cfg_frame, "Velocidade Scroll", "scroll_speed", 1, 10, 1)
         self._slider(cfg_frame, "Tempo Menu (s)", "menu_hold_seconds", 0.5, 3.0, 0.1)
-        self._slider(cfg_frame, "Margem câmera", "cam_margin", 0.0, 0.15, 0.01)
+        self._slider(cfg_frame, "Zona de trabalho", "cam_margin", 0.05, 0.35, 0.01)
         self._mapping_mode_selector(cfg_frame)
         self._hand_selector(cfg_frame)
 

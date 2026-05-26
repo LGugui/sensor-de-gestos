@@ -4,8 +4,16 @@ import time
 
 
 def _get_screen_size():
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)  # per-monitor DPI aware
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
     w = ctypes.windll.user32.GetSystemMetrics(0)
     h = ctypes.windll.user32.GetSystemMetrics(1)
+    print(f"[mapper] tela detectada: {w}x{h}  ({w/h:.3f}:1)")
     return w, h
 
 
@@ -83,16 +91,37 @@ class CoordMapper:
         self._cal = (min_x, max_x, min_y, max_y)
 
     def set_frame_size(self, cam_w, cam_h):
-        """Compute mapping bounds so active zone matches screen aspect ratio."""
-        ar_s = self.screen_w / self.screen_h
-        ar_c = cam_w / cam_h
-        if ar_s > ar_c:   # screen wider → crop top/bottom
-            my = (1.0 - ar_c / ar_s) / 2
-            mx = 0.0
-        else:              # screen taller → crop sides
-            mx = (1.0 - ar_s / ar_c) / 2
-            my = 0.0
+        """
+        Compute active zone: same aspect ratio as screen, centered in camera.
+        margin controls how much dead zone surrounds the active area.
+        """
+        ar_s = self.screen_w / self.screen_h  # e.g. 1.778 for 16:9
+
+        # Available area after applying margin from each side
+        avail_w = cam_w * (1.0 - 2 * self.margin)
+        avail_h = cam_h * (1.0 - 2 * self.margin)
+
+        # Fit screen aspect ratio inside available area (letterbox / pillarbox)
+        if avail_w / avail_h >= ar_s:
+            # Height-limited: fill height, shrink width to match screen ratio
+            zone_h = avail_h
+            zone_w = zone_h * ar_s
+        else:
+            # Width-limited: fill width, shrink height to match screen ratio
+            zone_w = avail_w
+            zone_h = zone_w / ar_s
+
+        zone_w_norm = zone_w / cam_w
+        zone_h_norm = zone_h / cam_h
+
+        mx = (1.0 - zone_w_norm) / 2
+        my = (1.0 - zone_h_norm) / 2
+
         self._ar_bounds = (mx, 1.0 - mx, my, 1.0 - my)
+        print(f"[mapper] câmera: {cam_w}x{cam_h}  ({cam_w/cam_h:.3f}:1)")
+        print(f"[mapper] tela:   {self.screen_w}x{self.screen_h}  ({ar_s:.3f}:1)")
+        print(f"[mapper] margem: {self.margin:.2f}  zona: {zone_w_norm*100:.0f}% x {zone_h_norm*100:.0f}%")
+        print(f"[mapper] bounds: x=[{mx:.3f}, {1-mx:.3f}]  y=[{my:.3f}, {1-my:.3f}]")
 
     @property
     def effective_bounds(self):

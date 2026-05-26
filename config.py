@@ -9,7 +9,7 @@ DEFAULTS = {
     "dominant_hand": "Right",
     "flip_handedness": True,
     "ema_alpha": 0.35,
-    "cam_margin": 0.1,
+    "cam_margin": 0.15,
     "dead_zone_px": 5,
     "pinch_close": 0.05,
     "pinch_open": 0.08,

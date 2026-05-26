@@ -83,35 +83,47 @@ class Overlay:
         x2 = int(bounds[1] * w)
         y1 = int(bounds[2] * h)
         y2 = int(bounds[3] * h)
+        aw = x2 - x1
+        ah = y2 - y1
 
-        # Darken areas outside the active zone (reference only)
+        # Dead zone: heavily darken area outside active zone
         buf = frame.copy()
         cv2.rectangle(buf, (0, 0), (w, y1), (0, 0, 0), -1)
         cv2.rectangle(buf, (0, y2), (w, h), (0, 0, 0), -1)
         cv2.rectangle(buf, (0, y1), (x1, y2), (0, 0, 0), -1)
         cv2.rectangle(buf, (x2, y1), (w, y2), (0, 0, 0), -1)
-        cv2.addWeighted(buf, 0.45, frame, 0.55, 0, frame)
+        cv2.addWeighted(buf, 0.6, frame, 0.4, 0, frame)
 
-        # 3x3 grid — subtle inner reference lines
-        aw = x2 - x1
-        ah = y2 - y1
+        # Active zone: subtle vignette so center is visually clear
+        inner_buf = frame.copy()
+        cv2.rectangle(inner_buf, (x1, y1), (x2, y2), (0, 30, 40), -1)
+        cv2.addWeighted(inner_buf, 0.12, frame, 0.88, 0, frame)
+
+        # 3x3 grid — screen quadrant reference
         for col in range(1, 3):
             lx = x1 + col * aw // 3
-            cv2.line(frame, (lx, y1), (lx, y2), (0, 100, 130), 1)
+            cv2.line(frame, (lx, y1 + 1), (lx, y2 - 1), (0, 120, 160), 1)
         for row in range(1, 3):
             ly = y1 + row * ah // 3
-            cv2.line(frame, (x1, ly), (x2, ly), (0, 100, 130), 1)
+            cv2.line(frame, (x1 + 1, ly), (x2 - 1, ly), (0, 120, 160), 1)
 
-        # Outer border = screen limit (thick, prominent)
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 220, 255), 2)
+        # Corner tick marks (like a monitor bezel)
+        tick = 14
+        color_corner = (0, 220, 255)
+        for cx, cy, dx, dy in [(x1, y1, 1, 1), (x2, y1, -1, 1),
+                                (x2, y2, -1, -1), (x1, y2, 1, -1)]:
+            cv2.line(frame, (cx, cy), (cx + dx * tick, cy), color_corner, 2)
+            cv2.line(frame, (cx, cy), (cx, cy + dy * tick), color_corner, 2)
 
-        # Corner labels
-        pad = 4
+        # Outer border = screen edges (prominent)
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 200, 240), 2)
+
+        # Center label
         font = cv2.FONT_HERSHEY_SIMPLEX
-        cv2.putText(frame, "TELA", (x1 + pad, y1 + 14), font, 0.38, (0, 220, 255), 1)
-        cv2.putText(frame, "TELA", (x2 - 38, y1 + 14), font, 0.38, (0, 220, 255), 1)
-        cv2.putText(frame, "TELA", (x1 + pad, y2 - 4), font, 0.38, (0, 220, 255), 1)
-        cv2.putText(frame, "TELA", (x2 - 38, y2 - 4), font, 0.38, (0, 220, 255), 1)
+        label = f"TELA  {aw}x{ah}px"
+        lw, lh = cv2.getTextSize(label, font, 0.35, 1)[0]
+        cv2.putText(frame, label, (x1 + (aw - lw) // 2, y1 + 14),
+                    font, 0.35, (0, 180, 210), 1)
 
     def _draw_menu(self, frame, menu, cursor_pos):
         h, w = frame.shape[:2]

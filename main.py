@@ -202,6 +202,9 @@ def main():
                     # Ring hold → draw mode
                     victory_progress = gestures.detect_ring_hold(cursor_lm)
                     if victory_progress >= 1.0:
+                        if _dragging:
+                            mouse.release(Button.left)
+                            _dragging = False
                         draw_mode = True
                         drawing.show()
                         gestures.reset_pinch()
@@ -212,6 +215,9 @@ def main():
                     elif cursor_lm and control_lm:
                         palm_progress = gestures.detect_dual_palm(cursor_lm, control_lm)
                         if palm_progress >= 1.0:
+                            if _dragging:
+                                mouse.release(Button.left)
+                                _dragging = False
                             menu.toggle()
                             gestures.reset_pinch()
                             mode = MODE_MENU
@@ -219,6 +225,9 @@ def main():
                     # Control fist OR dominant-hand pinky alone → keyboard
                     elif ((control_lm and gestures.detect_fist(control_lm))
                           or gestures.detect_pinky_only(cursor_lm)):
+                        if _dragging:
+                            mouse.release(Button.left)
+                            _dragging = False
                         keyboard.toggle()
                         mode = MODE_KEYBOARD if keyboard.open else MODE_NORMAL
 
@@ -227,6 +236,9 @@ def main():
                         if not control_lm:
                             palm_progress = gestures.detect_open_palm(cursor_lm)
                             if palm_progress >= 1.0:
+                                if _dragging:
+                                    mouse.release(Button.left)
+                                    _dragging = False
                                 menu.toggle()
                                 gestures.reset_pinch()
                                 mode = MODE_MENU

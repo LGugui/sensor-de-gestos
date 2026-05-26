@@ -8,9 +8,11 @@ from detector import HandDetector
 from drawing_overlay import DrawingOverlay
 from gestures import GestureDetector
 from keyboard_overlay import VirtualKeyboard
+from launcher import Launcher, RESULT_START, RESULT_TUTORIAL, RESULT_QUIT
 from mapper import CoordMapper
 from menu import GestureMenu
 from overlay import Overlay
+from tutorial import run_tutorial
 
 MODE_NORMAL    = "NAVEGACAO"
 MODE_PRECISION = "PRECISAO"
@@ -36,9 +38,18 @@ def _split_hands(hands, dominant):
 
 
 def main():
+    # Launcher
+    launcher = Launcher()
+    result = launcher.run()
+    if result == RESULT_QUIT:
+        return
+
     cfg = cfg_module.load()
     cam = Camera(cfg["camera_index"])
     detector, mapper, mouse, gestures = _rebuild(cfg)
+
+    if result == RESULT_TUTORIAL:
+        run_tutorial(cam, detector)
     overlay = Overlay()
     menu = GestureMenu()
     keyboard = VirtualKeyboard()
@@ -235,6 +246,8 @@ def main():
                 detector.close()
                 detector, mapper, mouse, gestures = _rebuild(cfg)
                 print("Config recarregada.")
+            elif key == ord("?") or key == ord("/"):
+                overlay.show_cheatsheet = not overlay.show_cheatsheet
 
     finally:
         if draw_mode:

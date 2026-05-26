@@ -93,11 +93,11 @@ class CoordMapper:
         m = self.margin
         return max(0.0, min(1.0, (v - m) / (1.0 - 2 * m)))
 
-    def map(self, landmarks, precision=False):
+    def map(self, landmarks, precision=False, depth=None):
         tip = landmarks[self._lm_idx]
         if self.mode == "relative":
-            return self._map_relative(tip, precision)
-        return self._map_absolute(tip, precision)
+            return self._map_relative(tip, precision, depth)
+        return self._map_absolute(tip, precision, depth)
 
     def map_draw(self, landmarks, precision=False):
         """Draw mode: always uses index tip (lm[8]) — pen follows fingertip."""
@@ -106,9 +106,7 @@ class CoordMapper:
             return self._map_relative(tip, precision)
         return self._map_absolute(tip, precision)
 
-    def _map_absolute(self, tip, precision):
-        if not self._in_active_area(tip):
-            return self.prev_x, self.prev_y
+    def _map_absolute(self, tip, precision, depth=None):
         nx = self._normalize(tip.x)
         ny = self._normalize(tip.y)
         raw_x = nx * self.screen_w
@@ -120,6 +118,10 @@ class CoordMapper:
 
         dx = sx - self.prev_x
         dy = sy - self.prev_y
+
+        # Auto-precision: hand close to camera → precision mode
+        if depth is not None and depth > 0.20:
+            precision = True
 
         if precision:
             dx *= self.precision_factor
@@ -134,7 +136,7 @@ class CoordMapper:
             return new_x, new_y
         return self.prev_x, self.prev_y
 
-    def _map_relative(self, tip, precision):
+    def _map_relative(self, tip, precision, depth=None):
         if self._prev_lm_x is None:
             self._prev_lm_x = tip.x
             self._prev_lm_y = tip.y
@@ -150,6 +152,12 @@ class CoordMapper:
         dy = (tip.y - self._prev_lm_y) * self.screen_h * self.sensitivity
         self._prev_lm_x = tip.x
         self._prev_lm_y = tip.y
+
+        # Depth-adaptive sensitivity: far (small hand) = faster, close (large) = slower
+        if depth is not None:
+            depth_scale = max(0.4, min(2.5, 0.15 / max(0.05, depth)))
+            dx *= depth_scale
+            dy *= depth_scale
 
         if self.acceleration:
             speed = math.sqrt(dx * dx + dy * dy)

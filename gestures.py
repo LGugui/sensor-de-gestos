@@ -17,6 +17,7 @@ class GestureDetector:
         self._palm_start = None
         self._dual_palm_start = None
         self._fist_prev = False
+        self._victory_start = None
 
     def _dist(self, a, b):
         return math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
@@ -110,6 +111,22 @@ class GestureDetector:
                 self._palm_start = time.time()
             return min(1.0, (time.time() - self._palm_start) / self.menu_hold)
         self._palm_start = None
+        return 0.0
+
+    def detect_victory(self, landmarks):
+        """V sign: index + middle extended, others closed. Returns hold progress [0,1]."""
+        is_v = (
+            self._extended(landmarks, 8, 6)
+            and self._extended(landmarks, 12, 10)
+            and not self._extended(landmarks, 16, 14)
+            and not self._extended(landmarks, 20, 18)
+            and not (landmarks[4].y < landmarks[3].y)  # thumb NOT extended
+        )
+        if is_v:
+            if self._victory_start is None:
+                self._victory_start = time.time()
+            return min(1.0, (time.time() - self._victory_start) / self.menu_hold)
+        self._victory_start = None
         return 0.0
 
     def detect_dual_palm(self, lm_a, lm_b):

@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pyo
+hand_landmarker.task
+config.json
+.env

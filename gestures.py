@@ -26,6 +26,31 @@ class GestureDetector:
         self._touch_span = 0.2
         self._victory_start = None
         self._last_click_t = None
+        self._prev_depth = None
+
+    # ── Pseudo-depth (webcam only) ────────────────────────────────────────
+    # Wrist-to-middle-MCP distance in normalized space correlates with
+    # hand distance from camera: ~0.10 = far (~80cm), ~0.15 = normal (~50cm),
+    # ~0.25 = close (~25cm).
+    _DEPTH_REF = 0.15
+
+    def estimate_depth(self, lm):
+        dx = lm[9].x - lm[0].x
+        dy = lm[9].y - lm[0].y
+        return math.sqrt(dx * dx + dy * dy)
+
+    def get_depth_scroll_delta(self, lm):
+        """Scroll delta from hand moving toward/away camera."""
+        depth = self.estimate_depth(lm)
+        if self._prev_depth is None:
+            self._prev_depth = depth
+            return 0
+        delta = (depth - self._prev_depth) * self.scroll_speed * 60
+        self._prev_depth = depth
+        return int(delta)
+
+    def reset_depth(self):
+        self._prev_depth = None
 
     def _dist(self, a, b):
         return math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)

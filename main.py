@@ -243,16 +243,21 @@ def main():
                                 gestures.reset_pinch()
                                 mode = MODE_MENU
 
+                        depth = gestures.estimate_depth(cursor_lm)
+
                         if not menu.open:
                             if gestures.detect_scroll_mode(cursor_lm):
                                 mode = MODE_SCROLL
                                 scroll_mode = True
-                                delta = gestures.get_scroll_delta(cursor_lm)
+                                delta_y = gestures.get_scroll_delta(cursor_lm)
+                                delta_z = gestures.get_depth_scroll_delta(cursor_lm)
+                                delta = delta_y + delta_z
                                 if delta:
                                     mouse.scroll(delta)
                             else:
                                 if scroll_mode:
                                     gestures.reset_scroll()
+                                    gestures.reset_depth()
                                     scroll_mode = False
                                 precision = gestures.detect_precision(cursor_lm)
                                 if precision:
@@ -277,12 +282,13 @@ def main():
                                     elif pinch == "right":
                                         mouse.click(Button.right)
 
-                                nx, ny = mapper.map(cursor_lm, precision=precision)
+                                nx, ny = mapper.map(cursor_lm, precision=precision, depth=depth)
                                 cursor_x, cursor_y = nx, ny
                                 mouse.move(cursor_x, cursor_y)
                 else:
                     if scroll_mode:
                         gestures.reset_scroll()
+                        gestures.reset_depth()
                         scroll_mode = False
 
             # ── Render ───────────────────────────────────────────────────

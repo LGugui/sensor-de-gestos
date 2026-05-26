@@ -195,9 +195,9 @@ class Overlay:
         names = ["thumb", "index", "middle", "ring", "pinky"]
         labels = ["POL", "IND", "MED", "ANE", "MIN"]
         px = 10
-        py = h - 60
+        py = h - 80
         buf = frame.copy()
-        cv2.rectangle(buf, (px - 4, py - 18), (px + 270, py + 22), (10, 10, 10), -1)
+        cv2.rectangle(buf, (px - 4, py - 18), (px + 270, py + 42), (10, 10, 10), -1)
         cv2.addWeighted(buf, 0.75, frame, 0.25, 0, frame)
         cv2.putText(frame, "DEBUG DEDOS:", (px, py),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 220, 255), 1)
@@ -211,6 +211,14 @@ class Overlay:
         d_right = math.sqrt((lm[4].x - lm[12].x)**2 + (lm[4].y - lm[12].y)**2)
         cv2.putText(frame, f"pinch L:{d_left:.3f} R:{d_right:.3f}", (px, py + 18),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.4, (180, 180, 80), 1)
+        # pseudo-depth bar
+        depth = math.sqrt((lm[9].x - lm[0].x)**2 + (lm[9].y - lm[0].y)**2)
+        depth_norm = max(0.0, min(1.0, (depth - 0.08) / (0.25 - 0.08)))
+        bar_w = int(150 * depth_norm)
+        cv2.rectangle(frame, (px, py + 28), (px + 150, py + 38), (50, 50, 50), -1)
+        cv2.rectangle(frame, (px, py + 28), (px + bar_w, py + 38), (0, 200, 255), -1)
+        cv2.putText(frame, f"DEPTH:{depth:.3f}", (px + 156, py + 38),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (0, 200, 255), 1)
 
     def show(self, frame):
         cv2.imshow(self._win, frame)

@@ -76,10 +76,33 @@ class CoordMapper:
         self._prev_lm_y = None
         self.prev_x = self.screen_w // 2
         self.prev_y = self.screen_h // 2
-        self._cal = None  # (min_x, max_x, min_y, max_y) — set by calibrate()
+        self._cal = None        # (min_x, max_x, min_y, max_y) — set by calibrate()
+        self._ar_bounds = None  # computed from screen/camera aspect ratio
 
     def calibrate(self, min_x, max_x, min_y, max_y):
         self._cal = (min_x, max_x, min_y, max_y)
+
+    def set_frame_size(self, cam_w, cam_h):
+        """Compute mapping bounds so active zone matches screen aspect ratio."""
+        ar_s = self.screen_w / self.screen_h
+        ar_c = cam_w / cam_h
+        if ar_s > ar_c:   # screen wider → crop top/bottom
+            my = (1.0 - ar_c / ar_s) / 2
+            mx = 0.0
+        else:              # screen taller → crop sides
+            mx = (1.0 - ar_s / ar_c) / 2
+            my = 0.0
+        self._ar_bounds = (mx, 1.0 - mx, my, 1.0 - my)
+
+    @property
+    def effective_bounds(self):
+        """Active mapping area (min_x, max_x, min_y, max_y) in normalized coords."""
+        if self._cal:
+            return self._cal
+        if self._ar_bounds:
+            return self._ar_bounds
+        m = self.margin
+        return (m, 1.0 - m, m, 1.0 - m)
 
     def _norm_cal(self, v, lo, hi):
         if hi - lo < 0.01:
@@ -115,12 +138,9 @@ class CoordMapper:
         return self._map_absolute(tip, precision)
 
     def _map_absolute(self, tip, precision, depth=None):
-        if self._cal:
-            nx = self._norm_cal(tip.x, self._cal[0], self._cal[1])
-            ny = self._norm_cal(tip.y, self._cal[2], self._cal[3])
-        else:
-            nx = self._normalize(tip.x)
-            ny = self._normalize(tip.y)
+        b = self.effective_bounds
+        nx = self._norm_cal(tip.x, b[0], b[1])
+        ny = self._norm_cal(tip.y, b[2], b[3])
         raw_x = nx * self.screen_w
         raw_y = ny * self.screen_h
 

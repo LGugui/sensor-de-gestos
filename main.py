@@ -96,6 +96,9 @@ def main():
             if frame is None:
                 break
 
+            if mapper._ar_bounds is None and not mapper._cal:
+                mapper.set_frame_size(frame.shape[1], frame.shape[0])
+
             frame, hands = detector.find_hands(frame, draw=overlay.active)
             dominant = cfg["dominant_hand"]
             cursor_lm, control_lm = _split_hands(hands, dominant)
@@ -331,7 +334,7 @@ def main():
                     cursor_pos=(cursor_x, cursor_y),
                     debug_lm=cursor_lm,
                     gestures=gestures,
-                    cam_margin=mapper.margin,
+                    mapping_bounds=mapper.effective_bounds,
                 )
                 overlay.show(frame)
 

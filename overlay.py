@@ -28,12 +28,15 @@ class Overlay:
             self._fps_hist.pop(0)
         return sum(self._fps_hist) / len(self._fps_hist)
 
-    def draw(self, frame, mode, hand_detected, palm_progress=0.0, menu=None, cursor_pos=None, debug_lm=None, gestures=None, cam_margin=None):
+    def draw(self, frame, mode, hand_detected, palm_progress=0.0, menu=None, cursor_pos=None, debug_lm=None, gestures=None, cam_margin=None, mapping_bounds=None):
         fps = self._fps()
         h, w = frame.shape[:2]
 
-        if cam_margin is not None:
-            self._draw_mapping_area(frame, cam_margin)
+        if mapping_bounds is not None:
+            self._draw_mapping_area(frame, mapping_bounds)
+        elif cam_margin is not None:
+            m = cam_margin
+            self._draw_mapping_area(frame, (m, 1.0 - m, m, 1.0 - m))
 
         if self._flash > 0:
             cv2.rectangle(frame, (0, 0), (w, h), (0, 255, 0), 8)
@@ -73,13 +76,13 @@ class Overlay:
 
         return frame
 
-    def _draw_mapping_area(self, frame, margin):
+    def _draw_mapping_area(self, frame, bounds):
+        """bounds = (min_x, max_x, min_y, max_y) in normalized [0,1] coords."""
         h, w = frame.shape[:2]
-        m = margin
-        x1 = int(m * w)
-        y1 = int(m * h)
-        x2 = int((1 - m) * w)
-        y2 = int((1 - m) * h)
+        x1 = int(bounds[0] * w)
+        x2 = int(bounds[1] * w)
+        y1 = int(bounds[2] * h)
+        y2 = int(bounds[3] * h)
 
         # Darken areas outside the active zone (reference only)
         buf = frame.copy()

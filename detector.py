@@ -22,6 +22,11 @@ _CONNECTIONS = [
     (5,9),(9,13),(13,17),
 ]
 
+_COLORS = {
+    "Right": (0, 255, 0),
+    "Left":  (0, 180, 255),
+}
+
 
 def _ensure_model():
     if not os.path.exists(MODEL_PATH):
@@ -43,28 +48,42 @@ class HandDetector:
         )
         self.detector = vision.HandLandmarker.create_from_options(options)
         self._start = time.time()
+        self._flip_handedness = config.get("flip_handedness", True)
 
     def find_hands(self, frame, draw=True):
+        """Returns (frame, hands) where hands = list of (landmarks, label).
+        label is 'Left' or 'Right' already adjusted for camera flip."""
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
         ts_ms = int((time.time() - self._start) * 1000)
         results = self.detector.detect_for_video(mp_image, ts_ms)
 
-        landmarks = None
+        hands = []
         if results.hand_landmarks:
-            landmarks = results.hand_landmarks[0]
-            if draw:
-                self._draw(frame, landmarks)
+            for lm, hd in zip(results.hand_landmarks, results.handedness):
+                raw_label = hd[0].category_name  # "Left" or "Right"
+                # Camera is flipped so MediaPipe labels are mirrored — invert
+                if self._flip_handedness:
+                    label = "Left" if raw_label == "Right" else "Right"
+                else:
+                    label = raw_label
+                hands.append((lm, label))
+                if draw:
+                    self._draw(frame, lm, label)
 
-        return frame, landmarks
+        return frame, hands
 
-    def _draw(self, frame, landmarks):
+    def _draw(self, frame, landmarks, label="Right"):
         h, w = frame.shape[:2]
+        color = _COLORS.get(label, (0, 255, 0))
         pts = [(int(lm.x * w), int(lm.y * h)) for lm in landmarks]
         for a, b in _CONNECTIONS:
-            cv2.line(frame, pts[a], pts[b], (0, 255, 0), 2)
+            cv2.line(frame, pts[a], pts[b], color, 2)
         for x, y in pts:
-            cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)
+            cv2.circle(frame, (x, y), 4, (255, 255, 255), -1)
+        # label tag near wrist
+        cv2.putText(frame, label, (pts[0][0] + 8, pts[0][1]),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
     def close(self):
         self.detector.close()

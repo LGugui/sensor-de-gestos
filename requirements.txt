@@ -3,3 +3,4 @@ opencv-python
 pynput
 numpy
 scikit-learn
+mss

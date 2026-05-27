@@ -173,29 +173,21 @@ class CoordMapper:
         raw_x = nx * self.screen_w
         raw_y = ny * self.screen_h
 
-        # One Euro Filter removes tremor adaptively
+        # One Euro Filter handles tremor — no dead zone needed in absolute mode
         sx = self._fx.filter(raw_x)
         sy = self._fy.filter(raw_y)
 
-        dx = sx - self.prev_x
-        dy = sy - self.prev_y
-
-        # Auto-precision: hand close to camera → precision mode
-        if depth is not None and depth > 0.20:
-            precision = True
-
         if precision:
-            dx *= self.precision_factor
-            dy *= self.precision_factor
+            # Precision: cursor glides slowly toward target (explicit gesture only)
+            sx = self.prev_x + (sx - self.prev_x) * self.precision_factor
+            sy = self.prev_y + (sy - self.prev_y) * self.precision_factor
 
-        new_x = max(0, min(self.screen_w - 1, int(self.prev_x + dx)))
-        new_y = max(0, min(self.screen_h - 1, int(self.prev_y + dy)))
+        new_x = max(0, min(self.screen_w - 1, int(sx)))
+        new_y = max(0, min(self.screen_h - 1, int(sy)))
 
-        if abs(dx) > self.dead_zone or abs(dy) > self.dead_zone:
-            self.prev_x = new_x
-            self.prev_y = new_y
-            return new_x, new_y
-        return self.prev_x, self.prev_y
+        self.prev_x = new_x
+        self.prev_y = new_y
+        return new_x, new_y
 
     def _map_relative(self, tip, precision, depth=None):
         if self._prev_lm_x is None:

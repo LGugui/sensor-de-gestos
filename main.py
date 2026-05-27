@@ -78,6 +78,7 @@ def main():
     prev_hand_detected = False
     _dragging = False
     _hand_lost_t = None
+    touch_enabled = cfg.get("touch_enabled", True)
 
     print("Sensor de Gestos v3 — Dual Hand + Modo Desenho")
     print("  Q=sair | O=overlay | R=reload | D=debug | K=teclado | B=pincel")
@@ -228,7 +229,13 @@ def main():
                 mode = MODE_NORMAL
                 _hand_lost_t = None
 
-                if hand_detected:
+                if hand_detected and not touch_enabled:
+                    # Touch disabled: still move cursor, no gestures/clicks
+                    nx, ny = mapper.map(cursor_lm, precision=False)
+                    cursor_x, cursor_y = nx, ny
+                    mouse.move(cursor_x, cursor_y)
+
+                elif hand_detected:
                     # Ring hold → draw mode
                     victory_progress = gestures.detect_ring_hold(cursor_lm)
                     if victory_progress >= 1.0:
@@ -335,6 +342,8 @@ def main():
                     debug_lm=cursor_lm,
                     gestures=gestures,
                     mapping_bounds=mapper.effective_bounds,
+                    screen_size=(mapper.screen_w, mapper.screen_h),
+                    touch_enabled=touch_enabled,
                 )
                 overlay.show(frame)
 
@@ -343,10 +352,18 @@ def main():
                 break
             elif key == ord("o"):
                 overlay.toggle()
+            elif key == ord("t"):
+                touch_enabled = not touch_enabled
+                if _dragging and not touch_enabled:
+                    mouse.release(Button.left)
+                    _dragging = False
+                    gestures.reset_pinch()
+                print(f"Toques: {'ATIVADOS' if touch_enabled else 'DESATIVADOS'}")
             elif key == ord("r"):
                 cfg = cfg_module.load()
                 detector.close()
                 detector, mapper, mouse, gestures = _rebuild(cfg)
+                touch_enabled = cfg.get("touch_enabled", True)
                 print("Config recarregada.")
             elif key == ord("?") or key == ord("/"):
                 overlay.show_cheatsheet = not overlay.show_cheatsheet

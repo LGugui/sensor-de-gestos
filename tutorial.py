@@ -81,13 +81,13 @@ _STEPS = [
     },
     {
         "title": "MODO DESENHO",
-        "subtitle": "Gesto: Sinal de V com mao direita",
+        "subtitle": "Gesto: So o anelar levantado (4s)",
         "desc": [
-            "Faca SINAL DE V (indicador + medio)",
-            "por 1 segundo com a mao direita.",
-            "Pinch = desenhar | Punho esq = limpar.",
+            "Levante so o ANELAR (4o dedo),",
+            "segure 4 segundos. Barra enche.",
+            "Repita anelar 4s para sair do modo.",
         ],
-        "landmark_hint": 8,
+        "landmark_hint": 16,
         "color": (255, 60, 120),
     },
     {

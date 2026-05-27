@@ -11,14 +11,18 @@ DEFAULTS = {
     "ema_alpha": 0.35,
     "cam_margin": 0.15,
     "dead_zone_px": 5,
+    "filter_min_cutoff": 1.0,
+    "filter_beta": 0.1,
     "pinch_close": 0.05,
     "pinch_open": 0.08,
+    "pinch_frames_required": 2,
     "precision_threshold_min": 0.08,
     "precision_threshold_max": 0.15,
     "precision_factor": 0.3,
     "scroll_speed": 3,
     "debounce_ms": 300,
     "menu_hold_seconds": 1.5,
+    "touch_enabled": True,
 }
 
 
@@ -34,7 +38,10 @@ def load(path="config.json"):
     result = DEFAULTS.copy()
     for key, default in DEFAULTS.items():
         val = data.get(key, default)
-        if type(val) is type(default):
+        # camera_index accepts int or "screen"
+        if key == "camera_index":
+            result[key] = val
+        elif type(val) is type(default):
             result[key] = val
     return result
 

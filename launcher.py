@@ -75,6 +75,7 @@ class Launcher:
         cfg_frame = tk.Frame(r, bg=BG2, padx=20, pady=16)
         cfg_frame.pack(fill="x", padx=24, pady=8)
 
+        self._camera_source_selector(cfg_frame)
         self._slider(cfg_frame, "Responsividade", "filter_beta", 0.0, 0.5, 0.01)
         self._slider(cfg_frame, "Suavidade", "filter_min_cutoff", 0.1, 2.0, 0.1)
         self._slider(cfg_frame, "Sensibilidade", "sensitivity", 0.5, 3.0, 0.1)
@@ -124,6 +125,28 @@ class Launcher:
         s = ttk.Scale(row, from_=from_, to=to, variable=var,
                       orient="horizontal", length=140, command=on_change)
         s.pack(side="right", padx=6)
+
+    def _camera_source_selector(self, parent):
+        val = self._cfg.get("camera_index", 0)
+        current = "screen" if val == "screen" else "webcam"
+        var = tk.StringVar(value=current)
+        row = tk.Frame(parent, bg=BG2)
+        row.pack(fill="x", pady=4)
+        tk.Label(row, text="Fonte de vídeo", bg=BG2, fg=TEXT,
+                 font=("Segoe UI", 9), width=18, anchor="w").pack(side="left")
+
+        def on_change():
+            new_index = "screen" if var.get() == "screen" else 0
+            self._cfg["camera_index"] = new_index
+            self._save_cfg()
+
+        for opt, label in (("webcam", "Webcam"), ("screen", "Tela inteira")):
+            tk.Radiobutton(
+                row, text=label, variable=var, value=opt,
+                bg=BG2, fg=TEXT, selectcolor=BG,
+                activebackground=BG2, font=("Segoe UI", 9),
+                command=on_change,
+            ).pack(side="left", padx=4)
 
     def _hand_selector(self, parent):
         val = self._cfg.get("dominant_hand", "Right")

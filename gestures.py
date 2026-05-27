@@ -15,6 +15,9 @@ class GestureDetector:
 
         self._pinching_left = False
         self._pinching_right = False
+        self._pinch_left_frames = 0
+        self._pinch_right_frames = 0
+        self._pinch_frames_required = config.get("pinch_frames_required", 2)
         self._prev_scroll_y = None
         self._palm_start = None
         self._dual_palm_start = None
@@ -141,29 +144,40 @@ class GestureDetector:
         return False
 
     def detect_pinch(self, landmarks):
-        """Returns 'left', 'right' on transition, else None. Has hysteresis."""
+        """Returns 'left', 'right' on transition, else None.
+        Requires pinch_frames_required consecutive frames to prevent false positives."""
         probs = self._tf_probs(landmarks)
         fired = None
 
         if probs:
-            # TF path: hysteresis via probability bands (0.70 start, 0.35 stop)
             is_l = (probs.get("pinch_left", 0) > (0.35 if self._pinching_left else 0.70))
             is_r = (probs.get("pinch_right", 0) > (0.35 if self._pinching_right else 0.70))
         else:
-            # Rule-based fallback
             dl = self._dist(landmarks[4], landmarks[8])
             dr = self._dist(landmarks[4], landmarks[12])
             is_l = dl < (self.pinch_open if self._pinching_left else self.pinch_close)
             is_r = dr < (self.pinch_open if self._pinching_right else self.pinch_close)
 
-        if not self._pinching_left and is_l:
+        # Left pinch with frame debounce
+        if is_l:
+            self._pinch_left_frames += 1
+        else:
+            self._pinch_left_frames = 0
+
+        if not self._pinching_left and self._pinch_left_frames >= self._pinch_frames_required:
             self._pinching_left = True
             fired = "left"
         elif self._pinching_left and not is_l:
             self._pinching_left = False
 
+        # Right pinch with frame debounce
+        if is_r:
+            self._pinch_right_frames += 1
+        else:
+            self._pinch_right_frames = 0
+
         if not fired:
-            if not self._pinching_right and is_r:
+            if not self._pinching_right and self._pinch_right_frames >= self._pinch_frames_required:
                 self._pinching_right = True
                 fired = "right"
             elif self._pinching_right and not is_r:
@@ -205,6 +219,8 @@ class GestureDetector:
     def reset_pinch(self):
         self._pinching_left = False
         self._pinching_right = False
+        self._pinch_left_frames = 0
+        self._pinch_right_frames = 0
 
     def reset_victory(self):
         self._victory_start = None

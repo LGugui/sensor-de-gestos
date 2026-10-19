@@ -22,6 +22,7 @@ class GestureDetector:
         self._palm_start = None
         self._dual_palm_start = None
         self.touch_dist = config.get("touch_dist", 0.07)
+        self.visibility_threshold = config.get("visibility_threshold", 0.5)
 
         self._fist_prev = False
         self._pinky_prev = False
@@ -30,6 +31,9 @@ class GestureDetector:
         self._victory_start = None
         self._last_click_t = None
         self._prev_depth = None
+        self._all_touch_start = None
+        self._watch_tap_prev = False
+        self.all_touch_dist = config.get("all_touch_dist", 0.06)
 
         # TF classifier (optional — falls back to rule-based if absent)
         self._tf = None
@@ -81,6 +85,12 @@ class GestureDetector:
     def _dist(self, a, b):
         return math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2)
 
+    def _is_visible(self, lm, idx):
+        vis = getattr(lm[idx], 'visibility', None)
+        if vis is not None and vis >= 0:   # -1 = "not computed" no MediaPipe
+            return vis >= self.visibility_threshold
+        return lm[idx].z < 0.15           # z >= 0.15 = atrás da palma
+
     def _extended_sq(self, lm, tip, base):
         """Tip farther from wrist than base → extended. Uses squared distance (no sqrt)."""
         w = lm[0]
@@ -90,11 +100,11 @@ class GestureDetector:
 
     def finger_states(self, lm):
         return {
-            "thumb":  self._extended_sq(lm, 4, 2),
-            "index":  self._extended_sq(lm, 8, 6),
-            "middle": self._extended_sq(lm, 12, 10),
-            "ring":   self._extended_sq(lm, 16, 14),
-            "pinky":  self._extended_sq(lm, 20, 18),
+            "thumb":  self._is_visible(lm, 4)  and self._extended_sq(lm, 4, 2),
+            "index":  self._is_visible(lm, 8)  and self._extended_sq(lm, 8, 6),
+            "middle": self._is_visible(lm, 12) and self._extended_sq(lm, 12, 10),
+            "ring":   self._is_visible(lm, 16) and self._extended_sq(lm, 16, 14),
+            "pinky":  self._is_visible(lm, 20) and self._extended_sq(lm, 20, 18),
         }
 
     def _all_extended(self, lm):
@@ -157,6 +167,10 @@ class GestureDetector:
             dr = self._dist(landmarks[4], landmarks[12])
             is_l = dl < (self.pinch_open if self._pinching_left else self.pinch_close)
             is_r = dr < (self.pinch_open if self._pinching_right else self.pinch_close)
+            if not self._is_visible(landmarks, 4) or not self._is_visible(landmarks, 8):
+                is_l = False
+            if not self._is_visible(landmarks, 4) or not self._is_visible(landmarks, 12):
+                is_r = False
 
         # Left pinch with frame debounce
         if is_l:
@@ -288,6 +302,34 @@ class GestureDetector:
             return min(1.0, (time.time() - self._dual_palm_start) / self.menu_hold)
         self._dual_palm_start = None
         return 0.0
+
+    def detect_all_touch(self, lm):
+        """All 5 fingertips converge (tulip) with hand pointing up. Returns [0,1] hold progress."""
+        tips = [lm[4], lm[8], lm[12], lm[16], lm[20]]
+        cx = sum(t.x for t in tips) / 5
+        cy = sum(t.y for t in tips) / 5
+        all_close = all(
+            math.sqrt((t.x - cx) ** 2 + (t.y - cy) ** 2) < self.all_touch_dist
+            for t in tips
+        )
+        pointing_up = lm[9].y < lm[0].y - 0.03
+        if all_close and pointing_up:
+            if self._all_touch_start is None:
+                self._all_touch_start = time.time()
+            return min(1.0, (time.time() - self._all_touch_start) / self.menu_hold)
+        self._all_touch_start = None
+        return 0.0
+
+    def detect_watch_tap(self, lm_dominant, lm_control):
+        """Non-dominant index tip taps dominant wrist. Rising edge."""
+        d = self._dist(lm_control[8], lm_dominant[0])
+        is_tapping = d < 0.07
+        fired = is_tapping and not self._watch_tap_prev
+        self._watch_tap_prev = is_tapping
+        return fired
+
+    def reset_all_touch(self):
+        self._all_touch_start = None
 
     def detect_hand_touch(self, lm_a, lm_b):
         """Index tips from both hands touch. Rising edge only."""

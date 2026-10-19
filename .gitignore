@@ -4,3 +4,6 @@ __pycache__/
 hand_landmarker.task
 config.json
 .env
+*.task
+calibration.json
+gaze_calibration.json

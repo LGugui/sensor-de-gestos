@@ -23,6 +23,23 @@ DEFAULTS = {
     "debounce_ms": 300,
     "menu_hold_seconds": 1.5,
     "touch_enabled": True,
+    "visibility_threshold": 0.5,
+    # ── Eye / face tracking (opt-in) ──────────────────────────────────
+    "eye_enabled": False,
+    "face_detection_confidence": 0.5,
+    "face_tracking_confidence": 0.5,
+    "head_sensitivity": 2.5,
+    "head_scroll_threshold": 0.03,
+    "blink_threshold": 0.5,
+    "dwell_ms": 800,
+    "dwell_radius_px": 40,
+    "gaze_filter_min_cutoff": 0.3,
+    "gaze_filter_beta": 0.08,
+    "head_x_flip": False,
+    "gaze_x_flip": False,
+    "gaze_y_flip": False,
+    "saccade_threshold": 0.15,
+    "saccade_passthrough": False,
 }
 
 
